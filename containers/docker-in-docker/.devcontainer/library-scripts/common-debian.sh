@@ -213,12 +213,15 @@ if [ -z "${USER}" ]; then export USER=$(whoami); fi
 if [[ "${PATH}" != *"$HOME/.local/bin"* ]]; then export PATH="${PATH}:$HOME/.local/bin"; fi
 
 # Display optional first run image specific notice if configured and terminal is interactive
-if [ -t 1 ] && [ -f "/usr/local/etc/vscode-dev-containers/first-run-notice.txt" ] && [ ! -f "$HOME/.config/vscode-dev-containers/first-run-notice-already-displayed" ]; then
-    cat /usr/local/etc/vscode-dev-containers/first-run-notice.txt
-    mkdir -p $HOME/.config/vscode-dev-containers
+if [ -t 1 ] && [ ! -f "$HOME/.config/vscode-dev-containers/first-run-notice-already-displayed" ]; then
+    if [ -f "/usr/local/etc/vscode-dev-containers/first-run-notice.txt" ]; then
+        cat "/usr/local/etc/vscode-dev-containers/first-run-notice.txt"
+    elif [ -f "/workspaces/.codespaces/shared/first-run-notice.txt" ]; then
+        cat "/workspaces/.codespaces/shared/first-run-notice.txt"
+    fi
+    mkdir -p "$HOME/.config/vscode-dev-containers"
     # Mark first run notice as displayed after 10s to avoid problems with fast terminal refreshes hiding it
-    (sleep 10s; touch "$HOME/.config/vscode-dev-containers/first-run-notice-already-displayed") & >/dev/null 2>&1
-    disown %+
+    ((sleep 10s; touch "$HOME/.config/vscode-dev-containers/first-run-notice-already-displayed") &)
 fi
 
 EOF
@@ -254,7 +257,11 @@ __bash_prompt() {
     local userpart='`export XIT=$? \
         && [ ! -z "${GITHUB_USER}" ] && echo -n "\[\033[0;32m\]@${GITHUB_USER} " || echo -n "\[\033[0;32m\]\u " \
         && [ "$XIT" -ne "0" ] && echo -n "\[\033[1;31m\]➜" || echo -n "\[\033[0m\]➜"`'
-    local gitbranch='`export BRANCH=$(git describe --contains --all HEAD 2>/dev/null); \
+    local gitbranch='`\
+        export BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); \
+        if [ "${BRANCH}" = "HEAD" ]; then \
+            export BRANCH=$(git describe --contains --all HEAD 2>/dev/null); \
+        fi; \
         if [ "${BRANCH}" != "" ]; then \
             echo -n "\[\033[0;36m\](\[\033[1;31m\]${BRANCH}" \
             && if git ls-files --error-unmatch -m --directory --no-empty-directory -o --exclude-standard ":/*" > /dev/null 2>&1; then \
